@@ -2,7 +2,7 @@ workflows:
   linux-system-check:
     name: Linux System Inspection
 
-    instance_type: linux_x4   # max available Linux machine
+    instance_type: linux_x2   # max available Linux machine
     max_build_duration: 60    # minutes
 
     triggering:
