@@ -1,0 +1,31 @@
+workflows:
+  linux-system-check:
+    name: Linux System Inspection
+
+    instance_type: linux_x2   # max available Linux machine
+    max_build_duration: 60    # minutes
+
+    triggering:
+      events:
+        - push
+
+    scripts:
+      - name: Update packages & install tools
+        script: |
+          sudo apt-get update
+          sudo apt-get install -y neofetch
+
+      - name: Show CPU info
+        script: |
+          echo "===== lscpu ====="
+          lscpu
+
+      - name: Show core count
+        script: |
+          echo "===== nproc ====="
+          nproc
+
+      - name: Run neofetch
+        script: |
+          echo "===== neofetch ====="
+          neofetch
