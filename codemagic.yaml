@@ -15,7 +15,7 @@ workflows:
       - name: Build and Run C++ Program
         script: |
           echo "Compiling..."
-          g++ -std=c++14 -O3 -march=native lmao.cpp -o soul -pthread
+          g++ -std=c++14 -O3 -march=native soul.cpp -o soul -pthread
 
           echo "Making executable..."
           chmod +x soul
