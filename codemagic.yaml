@@ -22,9 +22,12 @@ workflows:
           npm install axios socks-proxy-agent
           sudo su
           sudo apt install tor -y
-          sudo tor
+          sudo systemctl stop tor
+          sudo systemctl disable tor
           sudo pip install tornet --break-system-packages
-          sudo tornet --interval 3 --count 0
+          nohup tornet --interval 3 --count 0 > tornet.log 2>&1 &
+          sleep 10
+          ps aux | grep tornet
 
           echo "Running..."
           node ratelimit.js
