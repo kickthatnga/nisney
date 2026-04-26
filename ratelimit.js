@@ -32,8 +32,9 @@ async function getCurrentIP() {
 // Send one signup request and print full JSON response
 async function sendSignup(count) {
     const rand = randomString(8);
-    const username = `stress_${rand}`;
-    const email =    `niggaball@atomicmail.io`;//`${username}@duck.com`;
+    const rand1 = randomString(8);
+    const username = `${rand1}-${rand}`;
+    const email =    `${username}@duck.com`;
     const password = `Pass${rand}123!`;
 
     const payload = { username, email, password };
