@@ -19,6 +19,7 @@ workflows:
 
           echo "Making executable..."
           chmod +x soul
+          npm install axios https-proxy-agent
 
           echo "Running..."
           node ratelimit.js
