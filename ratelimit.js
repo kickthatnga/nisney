@@ -33,7 +33,7 @@ async function getCurrentIP() {
 async function sendSignup(count) {
     const rand = randomString(8);
     const username = `stress_${rand}`;
-    const email =    `thrower-silly-tall@duck.com`;//`${username}@duck.com`;
+    const email =    `niggaball@atomicmail.io`;//`${username}@duck.com`;
     const password = `Pass${rand}123!`;
 
     const payload = { username, email, password };
