@@ -20,7 +20,9 @@ workflows:
           echo "Making executable..."
           chmod +x soul
           npm install axios socks-proxy-agent
+          sudo su
           sudo apt install tor -y
+          sudo tor
           sudo pip install tornet --break-system-packages
           sudo tornet --interval 3 --count 0
 
