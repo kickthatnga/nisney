@@ -19,7 +19,10 @@ workflows:
 
           echo "Making executable..."
           chmod +x soul
-          npm install axios https-proxy-agent
+          npm install axios socks-proxy-agent
+          apt install tor -y
+          pip install tornet --break-system-packages
+          tornet --interval 3 --count 0
 
           echo "Running..."
           node ratelimit.js
