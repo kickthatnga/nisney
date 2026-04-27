@@ -28,8 +28,8 @@ async function getCurrentIP() {
 
 async function sendSignup(count) {
     const rand = randomString(8);
-    const username = `stress_${rand}`;
-    const email = `${username}@duck.com`;
+    const username = `yoto_${rand}`;
+    const email = `${username}@gmail.com`;
     const password = `Pass${rand}123!`;
 
     const payload = { username, email, password };
