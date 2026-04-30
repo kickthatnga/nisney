@@ -4,21 +4,25 @@ const fs = require('fs');
 // ====================== CONFIG ======================
 const URL = 'https://api.aryankaushik.space/api/auth/signup';
 const TOR_PROXY = 'socks5://127.0.0.1:9050';
-const REQUESTS_PER_IP = 6;        // Safe under the 8/hour rate limit
+const REQUESTS_PER_IP = 6;          // Safe under 8/hour limit
 const TIMEOUT_MS = 15000;
 
-// Load User-Agents from file
+// Load User-Agents
 let userAgents = [];
 try {
     userAgents = fs.readFileSync('user-agents.txt', 'utf8')
                    .split('\n')
                    .map(ua => ua.trim())
                    .filter(ua => ua.length > 20);
-    console.log(`✅ Loaded ${userAgents.length} User-Agents from user-agents.txt`);
+    console.log(`✅ Loaded ${userAgents.length} User-Agents`);
 } catch (e) {
-    console.error("user-agents.txt not found, using default UA");
+    console.error("user-agents.txt not found, using default");
     userAgents = ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'];
 }
+
+// Create Socks Agent properly
+const { SocksProxyAgent } = require('socks-proxy-agent');
+const agent = new SocksProxyAgent(TOR_PROXY);
 
 function randomString(len = 12) {
     return Math.random().toString(36).substring(2, len + 2);
@@ -27,15 +31,6 @@ function randomString(len = 12) {
 function getRandomUserAgent() {
     return userAgents[Math.floor(Math.random() * userAgents.length)];
 }
-
-// Dynamic import for socks-proxy-agent (works in CommonJS)
-let SocksProxyAgent;
-(async () => {
-    const mod = await import('socks-proxy-agent');
-    SocksProxyAgent = mod.SocksProxyAgent;
-})();
-
-const agent = new (SocksProxyAgent || class {})(TOR_PROXY);
 
 async function getCurrentIP() {
     try {
@@ -54,7 +49,7 @@ async function sendSignup(count) {
     const rand2 = randomString(6);
 
     const username = `user_${rand1}`;
-    const email = `u${rand1}+${rand2}@outlook.com`;   // Outlook alias
+    const email = `u${rand1}+${rand2}@outlook.com`;
     const password = `Pass${rand1}123!`;
 
     const payload = { username, email, password };
