@@ -49,7 +49,7 @@ async function sendSignup(count) {
     const rand2 = randomString(6);
 
     const username = `user_${rand1}`;
-    const email = `u${rand1}+${rand2}@outlook.com`;
+    const email = `u${rand1}${rand2}@outlook.com`;
     const password = `Pass${rand1}123!`;
 
     const payload = { username, email, password };
